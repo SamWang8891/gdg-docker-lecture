@@ -1,24 +1,101 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <title>Multi-stage Build Demo</title>
-    <style>
-        body {
-            font-family: -apple-system, sans-serif;
-            max-width: 600px;
-            margin: 2rem auto;
-            padding: 1rem;
-            line-height: 1.6;
-        }
-        code { background: #f4f4f4; padding: 0.2rem 0.4rem; border-radius: 3px; }
-    </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>project3 · multi-stage build</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 </head>
 <body>
-<h1>Multi-stage Build Demo</h1>
-<p>這個頁面是 Vite build 出來的，runtime image 不包含 Node.js 或 node_modules。</p>
-<p>實際 image 約 <strong>55 MB</strong>（單階段版本約 400 MB）。</p>
-<p id="info">Loading info...</p>
+<div class="wrap">
+
+  <div class="crumb">
+    <span class="dot"></span>
+    <b>gdg-docker-lecture</b>
+    <span class="sep">/</span>
+    <span>project3</span>
+    <span class="sep">/</span>
+    <span>multi-stage build</span>
+  </div>
+
+  <h1><span class="strike">node_modules</span> <span class="accent">left behind.</span></h1>
+  <p class="subtitle">這頁是 Vite build 完的靜態檔，由 nginx 服務。runtime image 沒有 Node、沒有 npm、沒有 source。</p>
+
+  <section class="term" aria-label="multi-stage diagram">
+    <header class="term-head">
+      <div class="lights">
+        <span class="light r"></span>
+        <span class="light y"></span>
+        <span class="light g"></span>
+      </div>
+      <span class="title">Dockerfile · two stages</span>
+      <span class="pid">nginx:alpine · :80</span>
+    </header>
+    <div class="term-body">
+
+      <div class="stages">
+        <div class="stage discarded">
+          <span class="tag">stage 1</span>
+          <h3>builder <span class="from">FROM node:20-alpine</span></h3>
+          <ul>
+            <li>npm ci → node_modules (≈ 200 MB)</li>
+            <li>npm run build → dist/</li>
+            <li>整個 Node runtime + 工具鏈</li>
+          </ul>
+          <div class="footnote">build 完整個 stage 被丟掉</div>
+        </div>
+
+        <div class="flow-arrow">
+          <span class="label">COPY --from</span>
+          <span class="arrow">→</span>
+          <span style="color:var(--mute);font-size:10px">dist/</span>
+        </div>
+
+        <div class="stage runtime">
+          <span class="tag">stage 2</span>
+          <h3>runtime <span class="from">FROM nginx:alpine</span></h3>
+          <ul>
+            <li>COPY --from=builder /app/dist</li>
+            <li>nginx 服務靜態檔</li>
+            <li>沒有 Node，沒有 npm，沒有 source</li>
+          </ul>
+          <div class="footnote">↑ 這就是你現在看到的 image</div>
+        </div>
+      </div>
+
+      <div class="compare">
+        <h4>image size · single-stage vs multi-stage</h4>
+
+        <div class="bar-row">
+          <span class="name">single-stage <span class="ann">(node:20)</span></span>
+          <div class="bar-track"><div class="bar-fill" data-w="100"></div></div>
+          <span class="size">≈ 1.2 GB</span>
+        </div>
+
+        <div class="bar-row">
+          <span class="name">multi-stage <span class="ann">(nginx:alpine)</span></span>
+          <div class="bar-track"><div class="bar-fill good" data-w="4.5"></div></div>
+          <span class="size">≈ 55 MB</span>
+        </div>
+
+        <div class="savings">
+          少 <b>~22×</b> · 沒有 build 工具、沒有 dependency tree、沒有 source code 外洩。
+        </div>
+      </div>
+
+      <div class="meta">
+        <span><b>page built at</b> <span class="val" id="built">—</span></span>
+        <span><b>loaded at</b> <span class="val" id="loaded">—</span></span>
+        <span><b>dom ready</b> <span class="val" id="ready">—</span></span>
+      </div>
+
+    </div>
+  </section>
+
+</div>
+
 <script type="module" src="./main.js"></script>
 </body>
 </html>

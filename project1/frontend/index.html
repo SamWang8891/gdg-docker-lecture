@@ -1,5 +1,408 @@
-<!-- frontend/index.html -->
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>project1 · frontend ↔ backend handshake</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0b0d0c;
+    --surface: #10130f;
+    --surface-2: #141812;
+    --border: #1d251f;
+    --border-bright: #2a3b2f;
+    --fg: #d8e4dc;
+    --fg-dim: #8a9a90;
+    --mute: #56655c;
+    --green: #7dd3a0;
+    --green-dim: #3d6b50;
+    --amber: #f4a261;
+    --red: #e76f51;
+    --shadow: 0 0 0 1px var(--border), 0 30px 80px -20px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 1.55;
+    letter-spacing: 0.01em;
+    padding: 48px 24px 80px;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* faint grid background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(125,211,160,.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(125,211,160,.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+    z-index: 0;
+  }
+
+  /* crt scanlines */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      180deg,
+      transparent 0 2px,
+      rgba(255,255,255,.012) 2px 3px
+    );
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: overlay;
+  }
+
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* top banner */
+  .crumb {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: var(--mute);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    opacity: 0;
+    animation: fade-in .6s .05s forwards;
+  }
+  .crumb .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+  .crumb b { color: var(--fg-dim); font-weight: 500; }
+  .crumb .sep { color: var(--border-bright); }
+
+  /* title */
+  h1 {
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+    color: var(--fg);
+    opacity: 0;
+    animation: fade-in .7s .15s forwards;
+  }
+  h1 .accent { color: var(--green); }
+  .subtitle {
+    color: var(--fg-dim);
+    margin: 0 0 36px;
+    opacity: 0;
+    animation: fade-in .7s .25s forwards;
+  }
+
+  /* terminal card */
+  .term {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(8px);
+    animation: rise .6s .35s forwards;
+  }
+
+  .term-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--mute);
+  }
+  .term-head .lights { display: flex; gap: 6px; }
+  .term-head .light {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--border-bright);
+  }
+  .term-head .light.r { background: #6b3a2f; }
+  .term-head .light.y { background: #6b5a2f; }
+  .term-head .light.g { background: var(--green-dim); }
+  .term-head .title {
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .term-head .pid { color: var(--fg-dim); }
+
+  .term-body {
+    padding: 22px 22px 26px;
+    font-size: 14px;
+  }
+
+  .line { display: flex; gap: 10px; margin-bottom: 6px; }
+  .line .prompt { color: var(--green); flex-shrink: 0; user-select: none; }
+  .line.out .prompt { color: var(--fg-dim); }
+  .line.comment { color: var(--mute); }
+  .line .text { color: var(--fg); }
+  .line .net { color: var(--amber); }
+
+  .json {
+    margin: 14px 0 4px;
+    padding: 14px 18px;
+    background: rgba(125,211,160,.04);
+    border-left: 2px solid var(--green-dim);
+    border-radius: 0 4px 4px 0;
+    white-space: pre;
+    font-size: 13.5px;
+    color: var(--fg);
+    min-height: 96px;
+    position: relative;
+  }
+  .json .k { color: var(--amber); }
+  .json .s { color: var(--green); }
+  .json .p { color: var(--fg-dim); }
+  .json.loading {
+    color: var(--fg-dim);
+    font-style: normal;
+  }
+  .json.error {
+    color: var(--red);
+    border-left-color: var(--red);
+    background: rgba(231,111,81,.06);
+  }
+
+  .cursor {
+    display: inline-block;
+    width: 8px; height: 1.05em;
+    background: var(--green);
+    vertical-align: text-bottom;
+    margin-left: 2px;
+    animation: blink 1s steps(2, start) infinite;
+  }
+
+  .meta {
+    margin-top: 14px;
+    display: flex;
+    gap: 28px;
+    font-size: 12px;
+    color: var(--mute);
+    letter-spacing: 0.06em;
+  }
+  .meta b { color: var(--fg-dim); font-weight: 500; }
+  .meta .val { color: var(--amber); font-weight: 500; }
+
+  /* status pills */
+  .status {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 22px;
+    opacity: 0;
+    animation: fade-in .6s .6s forwards;
+  }
+  .pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+  }
+  .pill .label {
+    font-size: 10.5px;
+    color: var(--mute);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .pill .val {
+    color: var(--fg);
+    font-size: 13.5px;
+    font-weight: 500;
+  }
+  .pill .led {
+    position: absolute;
+    top: 14px; right: 14px;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+  .pill.dim .led { background: var(--mute); box-shadow: none; animation: none; }
+  .pill.err .led { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+  /* hint */
+  .hint {
+    margin-top: 32px;
+    color: var(--mute);
+    font-size: 12px;
+    line-height: 1.7;
+    opacity: 0;
+    animation: fade-in .6s .8s forwards;
+  }
+  .hint code {
+    color: var(--fg-dim);
+    background: var(--surface);
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+  .hint .arrow { color: var(--green); }
+
+  @keyframes fade-in { to { opacity: 1; } }
+  @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: .45; transform: scale(.85); }
+  }
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    50.01%, 100% { opacity: 0; }
+  }
+
+  @media (max-width: 560px) {
+    body { padding: 28px 16px 60px; font-size: 13px; }
+    .status { grid-template-columns: 1fr; }
+    .meta { flex-direction: column; gap: 4px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="crumb">
+    <span class="dot"></span>
+    <b>gdg-docker-lecture</b>
+    <span class="sep">/</span>
+    <span>project1</span>
+    <span class="sep">/</span>
+    <span>frontend ↔ backend handshake</span>
+  </div>
+
+  <h1>two containers, <span class="accent">one network.</span></h1>
+  <p class="subtitle">browser → nginx (:80) → fastapi (:8000) — 沒有 localhost，全靠 docker DNS。</p>
+
+  <section class="term" aria-label="terminal">
+    <header class="term-head">
+      <div class="lights">
+        <span class="light r"></span>
+        <span class="light y"></span>
+        <span class="light g"></span>
+      </div>
+      <span class="title">handshake.session</span>
+      <span class="pid">pid 1 · nginx:alpine</span>
+    </header>
+    <div class="term-body">
+      <div class="line comment">
+        <span class="prompt">#</span>
+        <span class="text">瀏覽器打 nginx，nginx 透過 docker network 把 /api/* proxy 給 backend</span>
+      </div>
+      <div class="line">
+        <span class="prompt">$</span>
+        <span class="text">curl <span class="net">http://backend:8000/v1/hello</span>  <span style="color:var(--mute)"># container 內部視角</span></span>
+      </div>
+      <div class="line out">
+        <span class="prompt">▸</span>
+        <span class="text" style="color:var(--fg-dim)">fetch('/api/v1/hello') · nginx 會幫你 proxy 過去</span>
+      </div>
+
+      <pre class="json loading" id="out">  waiting for response<span class="cursor"></span></pre>
+
+      <div class="meta">
+        <span><b>latency</b> <span class="val" id="lat">—</span></span>
+        <span><b>status</b> <span class="val" id="status-code">—</span></span>
+        <span><b>at</b> <span class="val" id="ts">—</span></span>
+      </div>
+    </div>
+  </section>
+
+  <div class="status">
+    <div class="pill" id="p-front">
+      <span class="led"></span>
+      <span class="label">frontend</span>
+      <span class="val">nginx:alpine · :80</span>
+    </div>
+    <div class="pill dim" id="p-net">
+      <span class="led"></span>
+      <span class="label">network</span>
+      <span class="val">bridge · service dns</span>
+    </div>
+    <div class="pill dim" id="p-back">
+      <span class="led"></span>
+      <span class="label">backend</span>
+      <span class="val" id="back-val">probing…</span>
+    </div>
+  </div>
+
+  <p class="hint">
+    container 之間用 <code>service-name</code> 互找，不是 <code>localhost</code>。<br/>
+    打開 devtools 看 request：你會看到瀏覽器打的是 <code>/api/v1/hello</code>，由 nginx 反代到 <code>backend:8000</code> <span class="arrow">↗</span>
+  </p>
+
+</div>
+
 <script>
-    fetch('/api/v1/hello').then(r => r.json()).then(d =>
-        document.body.innerText = d.msg);
+  const out = document.getElementById('out');
+  const lat = document.getElementById('lat');
+  const ts = document.getElementById('ts');
+  const code = document.getElementById('status-code');
+  const pBack = document.getElementById('p-back');
+  const pNet = document.getElementById('p-net');
+  const backVal = document.getElementById('back-val');
+
+  const colorJson = (obj) => {
+    const json = JSON.stringify(obj, null, 2);
+    return json
+      .replace(/("(?:[^"\\]|\\.)*")(\s*:)/g, '<span class="k">$1</span>$2')
+      .replace(/:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="s">$1</span>')
+      .replace(/[{}\[\],]/g, m => `<span class="p">${m}</span>`);
+  };
+
+  const startedAt = performance.now();
+
+  fetch('/api/v1/hello')
+    .then(async r => {
+      const data = await r.json();
+      const ms = (performance.now() - startedAt).toFixed(1);
+
+      out.classList.remove('loading');
+      out.innerHTML = colorJson(data);
+
+      lat.textContent = ms + ' ms';
+      code.textContent = r.status + ' OK';
+      ts.textContent = new Date().toLocaleTimeString('en-GB');
+
+      pBack.classList.remove('dim');
+      pNet.classList.remove('dim');
+      backVal.textContent = 'fastapi · :8000';
+    })
+    .catch(err => {
+      out.classList.remove('loading');
+      out.classList.add('error');
+      out.textContent = '× ' + err.message + '\n  hint: backend container 起來了嗎？network 同一個嗎？';
+      code.textContent = 'ERR';
+      ts.textContent = new Date().toLocaleTimeString('en-GB');
+      pBack.classList.add('err');
+      backVal.textContent = 'unreachable';
+    });
 </script>
+</body>
+</html>

@@ -57,6 +57,15 @@ project1/
     └── compose.yml         # 課堂上一起寫
 ```
 
+## 跑起來
+
+```bash
+docker compose up -d
+
+# 強制重 build（如果你改了 Dockerfile 或 nginx.conf 或其他檔案）
+docker compose up --build -d
+```
+
 ---
 
 # Docker Network 完整解析

@@ -1,0 +1,9 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Docker class demo backend"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.136.3",
+    "uvicorn[standard]>=0.32.0"
+]

@@ -1,0 +1,13 @@
+# IDE
+.vscode/
+.idea/
+
+# AI
+.claude/
+
+# Python
+__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.venv/

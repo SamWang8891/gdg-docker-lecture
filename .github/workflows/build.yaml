@@ -1,0 +1,137 @@
+name: Build and Push Docker Images
+
+# ============================================================
+# 觸發條件
+# ============================================================
+on:
+  push:
+    branches: [main]        # push 到 main → 推 latest tag
+    tags: ['v*']            # push v1.2.3 之類的 tag → 推 semver tag
+  workflow_dispatch:        # 允許在 GitHub UI 手動觸發（debug 用）
+
+# ============================================================
+# 權限設定（這次 workflow 的權限範圍）
+# ============================================================
+# 預設只有 contents:read，要寫 packages 必須顯式開啟
+# 沒加這段，推 GHCR 會噴 "denied: permission_denied"
+permissions:
+  contents: read
+  packages: write
+
+# ============================================================
+# Job
+# ============================================================
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # matrix：用同一份 job 模板平行 build 多個 image
+    strategy:
+      fail-fast: false      # 一個失敗了不要中止其他的，方便看完整錯誤
+      matrix:
+        include:
+          - name: backend
+            context: ./project1/docker/backend
+          - name: frontend
+            context: ./project1/docker/frontend
+
+    steps:
+      # --------------------------------------------------------
+      # 1. Checkout source code
+      # --------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # --------------------------------------------------------
+      # 2. 設定 QEMU（給 multi-platform build 用，可以 build ARM）
+      # --------------------------------------------------------
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # --------------------------------------------------------
+      # 3. 設定 Buildx（進階 build 引擎，支援 cache、multi-platform）
+      # --------------------------------------------------------
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # --------------------------------------------------------
+      # 4. 登入 GHCR（GitHub Container Registry）
+      # --------------------------------------------------------
+      # GITHUB_TOKEN 是 GitHub 自動發的「這次 workflow 專用」臨時 token
+      # 不用自己去 settings 設，散會就失效
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # --------------------------------------------------------
+      # 5. 登入 Docker Hub
+      # --------------------------------------------------------
+      # 這個就要自己在 Docker Hub 申請 Access Token
+      # 並到 GitHub repo Settings → Secrets 加 DOCKERHUB_USERNAME / DOCKERHUB_TOKEN
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # --------------------------------------------------------
+      # 6. 把 GitHub repo owner 轉成小寫
+      # --------------------------------------------------------
+      # GHCR 路徑必須全小寫，但 GitHub username 可能有大寫
+      # 例如 SamWang/repo → 推 GHCR 要寫成 samwang/repo
+      - name: Lowercase repository owner
+        id: lc
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
+
+      # --------------------------------------------------------
+      # 7. 用 metadata-action 自動生成 tag 和 label
+      # --------------------------------------------------------
+      # 這個 action 會根據 git 事件自動生成「聰明 tag」：
+      #   push 到 main      → latest + main + sha-abc1234
+      #   push tag v1.2.3   → 1.2.3 + 1.2 + 1 + latest
+      # 比自己寫 shell script 處理 tag 邏輯穩得多
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # 同時推到兩個 registry（用換行分隔）
+          images: |
+            ghcr.io/${{ steps.lc.outputs.owner }}/${{ github.event.repository.name }}-${{ matrix.name }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/gdg-docker-${{ matrix.name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # --------------------------------------------------------
+      # 8. Build & Push
+      # --------------------------------------------------------
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          # multi-platform：同時 build x86_64 + ARM64
+          # 註：ARM build 用 QEMU emulate，會慢很多
+          # 想加速 demo，可以暫時改成只 build linux/amd64
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # 用 GitHub Actions cache 加速重複 build
+          # scope 分開避免 backend/frontend cache 互相覆蓋
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      # --------------------------------------------------------
+      # 9. 列出推上去的 tag，方便看 log 確認結果
+      # --------------------------------------------------------
+      - name: Image digest
+        run: |
+          echo "Pushed tags:"
+          echo "${{ steps.meta.outputs.tags }}"

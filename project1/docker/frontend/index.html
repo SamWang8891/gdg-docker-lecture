@@ -1,0 +1,5 @@
+<!-- frontend/index.html -->
+<script>
+    fetch('/api/hello').then(r => r.json()).then(d =>
+        document.body.innerText = d.msg);
+</script>

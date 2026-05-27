@@ -102,7 +102,10 @@ gdg-docker-lecture/
    - `alpine:3.20`
    - `debian:bookworm-slim`
 
-如果不會 uv 也沒關係，課堂上會帶。
+```bash
+docker pull python:3.14-slim node:20-alpine nginx:alpine alpine:3.20 debian:bookworm-slim
+```
+
 
 ## 教學風格
 

@@ -31,9 +31,9 @@ jobs:
       matrix:
         include:
           - name: backend
-            context: ./project1/docker/backend
+            context: ./project1/backend
           - name: frontend
-            context: ./project1/docker/frontend
+            context: ./project1/frontend
 
     steps:
       # --------------------------------------------------------

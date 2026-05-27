@@ -3,7 +3,7 @@
 
 services:
   backend:
-    build: ./backend
+    build: backend
     # 注意：沒有 ports！後端完全藏在 internal network 裡
     # 外面世界無法直接打 backend，只能透過 frontend 的 nginx proxy
     networks:
@@ -11,7 +11,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build: frontend
     ports:
       - "8080:80"   # 只有它對 host 開 port
     networks:

@@ -18,8 +18,8 @@ RUN apk add --no-cache \
     php83-openssl
 
 # Alpine 把 PHP 8.3 裝成 /usr/bin/php83
-# symlink 成 /usr/bin/php 方便執行
-RUN ln -s /usr/bin/php83 /usr/bin/php
+# symlink 成 /usr/bin/php 方便執行（-f 避免套件已建好同名 symlink 時撞檔）
+RUN ln -sf /usr/bin/php83 /usr/bin/php
 
 WORKDIR /app
 COPY script.php .

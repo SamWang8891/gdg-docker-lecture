@@ -1,0 +1,20 @@
+services:
+  backend:
+    image: samwang8891/gdg-docker-backend:latest
+    networks:
+      - internal
+    restart: unless-stopped
+
+  frontend:
+    image: samwang8891/gdg-docker-frontend:latest
+    ports:
+      - "8080:80"
+    networks:
+      - internal
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+networks:
+  internal:
+    driver: bridge
